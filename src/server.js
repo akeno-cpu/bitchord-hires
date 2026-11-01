@@ -1,5 +1,12 @@
 
 const http = require("node:http");
+
+try {
+  process.loadEnvFile();
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+
 const { searchTracks, getTrack } = require("./catalogue");
 const { generateDemoAudio } = require("./audio");
 
