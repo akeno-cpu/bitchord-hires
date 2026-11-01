@@ -5,7 +5,9 @@ const { generateDemoAudio } = require("./audio");
 
 const PORT = Number(process.env.PORT || 8787);
 const BASE_URL = (
-  process.env.BASE_URL || `http://localhost:${PORT}`
+  process.env.BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  `http://localhost:${PORT}`
 ).replace(/\/+$/, "");
 
 const demoAudio = generateDemoAudio();
