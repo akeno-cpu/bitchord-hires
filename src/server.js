@@ -7,7 +7,7 @@ try {
   if (error.code !== "ENOENT") throw error;
 }
 
-const { searchTracks, getTrack } = require("./catalogue");
+const { createProvider, resolveProviderMode, CREATOR_NAME } = require("./providers");
 const { generateDemoAudio } = require("./audio");
 
 const PORT = Number(process.env.PORT || 8787);
@@ -17,6 +17,8 @@ const BASE_URL = (
   `http://localhost:${PORT}`
 ).replace(/\/+$/, "");
 
+const providerState = resolveProviderMode(process.env);
+const provider = createProvider(process.env);
 const demoAudio = generateDemoAudio();
 
 function sendJSON(res, status, data) {
@@ -32,7 +34,7 @@ function sendError(res, status, message) {
   sendJSON(res, status, { error: message });
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -49,11 +51,10 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, BASE_URL);
   const pathname = url.pathname;
 
-  // 1. Manifest
   if (pathname === "/manifest.json") {
     return sendJSON(res, 200, {
       id: "dev.bitchord.amazon-music",
-      name: "Amazon Music Preview",
+      name: `Amazon Music [${CREATOR_NAME}]`,
       version: "1.0.0",
       resources: ["search", "stream"],
       allowDownloads: 0,
@@ -72,12 +73,12 @@ const server = http.createServer((req, res) => {
     });
   }
 
-  // 2. Search
   if (pathname === "/search") {
     const query = url.searchParams.get("q") || "";
-    const tracks = searchTracks(query);
+    const tracks = await provider.searchTracks(query);
 
     return sendJSON(res, 200, {
+      provider: providerState.mode,
       tracks: tracks.map(track => ({
         ...track,
         artworkURL: null
@@ -85,7 +86,6 @@ const server = http.createServer((req, res) => {
     });
   }
 
-  // 3. Stream resolution
   if (pathname.startsWith("/stream/")) {
     let id;
 
@@ -95,27 +95,21 @@ const server = http.createServer((req, res) => {
       return sendError(res, 400, "Invalid track ID");
     }
 
-    const track = getTrack(id);
+    try {
+      const quality = url.searchParams.get("quality") || "lossless";
+      const stream = await provider.resolveStream(id, quality);
 
-    if (!track) {
-      return sendError(res, 404, "Track not found");
+      return sendJSON(res, 200, {
+        ...stream,
+        url: stream.url || `${BASE_URL}/media/demo.wav`,
+        quality: stream.quality || quality || "lossless",
+        provider: providerState.mode
+      });
+    } catch (error) {
+      return sendError(res, 404, error.message || "Track not found");
     }
-
-    return sendJSON(res, 200, {
-      url: `${BASE_URL}/media/demo.wav`,
-      format: "wav",
-      quality: "Synthetic demo · PCM 16-bit / 44.1 kHz",
-      codec: "pcm_s16le",
-      container: "wav",
-      manifest: "none",
-      encrypted: false,
-      sampleRate: 44100,
-      bitDepth: 16,
-      bitrate: 705600
-    });
   }
 
-  // Demo audio
   if (pathname === "/media/demo.wav") {
     res.writeHead(200, {
       "Content-Type": "audio/wav",
@@ -125,16 +119,13 @@ const server = http.createServer((req, res) => {
     });
 
     if (req.method === "HEAD") return res.end();
-
     return res.end(demoAudio);
   }
 
-  // Health check
   if (pathname === "/health") {
     return sendJSON(res, 200, {
       status: "ok",
-      addon: "Amazon Music Preview",
-      mode: "mock"
+      addon: `Amazon Music [${CREATOR_NAME}]`
     });
   }
 
@@ -143,11 +134,10 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log("----------------------------------");
-  console.log(" BitChord Amazon Music Preview");
+  console.log(` Amazon Music [${CREATOR_NAME}]`);
   console.log("----------------------------------");
   console.log(`Server:   ${BASE_URL}`);
   console.log(`Manifest: ${BASE_URL}/manifest.json`);
   console.log(`Search:   ${BASE_URL}/search?q=midnight`);
-  console.log(`Mode:     MOCK CATALOGUE`);
   console.log("----------------------------------");
 });

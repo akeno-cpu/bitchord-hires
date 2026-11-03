@@ -1,13 +1,14 @@
 
 {
-  "name": "bitchord-amazon-music-preview",
+  "name": "amazon-music-akeno",
   "version": "1.0.0",
   "private": true,
-  "description": "Mock Amazon Music catalogue addon for BitChord",
+  "description": "Amazon Music [Akeno] addon for BitChord",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20.12.0"

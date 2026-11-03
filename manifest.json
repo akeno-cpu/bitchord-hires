@@ -1,7 +1,7 @@
 
 {
   "id": "dev.bitchord.amazon-music",
-  "name": "Amazon Music Preview",
+  "name": "Amazon Music [Akeno]",
   "version": "1.0.0",
   "resources": ["search", "stream"],
   "allowDownloads": 0,
